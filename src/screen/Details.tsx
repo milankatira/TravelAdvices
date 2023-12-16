@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons"; // Make sure to install expo icons or another icon library
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   FlatList,
+  Image,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -9,18 +12,22 @@ import {
   View,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
+import { fetchEstablishmentsByLatLong } from "../store/action/establishment";
 import { fetchLocationData } from "../store/action/locationSlice";
 import { fetchPlaces } from "../store/action/placeSlice";
 
 const travelAppUI = () => {
   const { places, loading, error } = useSelector((state: any) => state.place);
-  const { data } = useSelector((state: any) => state.location);
-  console.log(data, "data");
+  const { data } = useSelector((state: any) => state.establishment);
+  const { data: locationData } = useSelector((state: any) => state.location);
+  console.log(data?.data, "data");
   const dispatch = useDispatch();
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
   const [isSearching, setIsSearching] = useState(false);
-
+  const [establishmentType, setEstablishmentType] = useState("restaurants");
+  const [lat, setlat] = useState("");
+  const [long, setlong] = useState("");
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedTerm(searchTerm);
@@ -38,14 +45,45 @@ const travelAppUI = () => {
   }, [searchTerm]);
 
   useEffect(() => {
+    if (!lat || !long) {
+      Alert.alert("Alert Title", "My Alert Msg", [
+        { text: "OK", onPress: () => console.log("OK Pressed") },
+      ]);
+      return;
+    }
+    dispatch(
+      fetchEstablishmentsByLatLong({
+        establishmentType: establishmentType, // or 'restaurants', 'houses', etc.
+        latitude: lat,
+        longitude: long,
+      })
+    );
+  }, [lat, long, establishmentType]);
+
+  useEffect(() => {
     if (debouncedTerm) {
       dispatch(fetchPlaces(debouncedTerm));
     }
   }, [debouncedTerm]);
 
   const getCoordinated = async (data) => {
-   const d= await dispatch(fetchLocationData(data)).unwrap();
-   console.log(d,"DD")
+    const d = await dispatch(fetchLocationData(data)).unwrap();
+    setIsSearching(false);
+    setlat(d?.lat);
+    setlong(d?.lon);
+    // if (!d?.lat || !d?.lon) {
+    //   Alert.alert("Alert Title", "My Alert Msg", [
+    //     { text: "OK", onPress: () => console.log("OK Pressed") },
+    //   ]);
+    //   return;
+    // }
+    // await dispatch(
+    //   fetchEstablishmentsByLatLong({
+    //     establishmentType: "hotels", // or 'restaurants', 'houses', etc.
+    //     latitude: d?.lat,
+    //     longitude: d?.lon,
+    //   })
+    // );
   };
 
   const renderItem = ({ item }) => (
@@ -102,14 +140,51 @@ const travelAppUI = () => {
         <Text style={styles.categoryTitle}>Explore Categories</Text>
         <FlatList
           horizontal
-          data={[{ key: "Camping" }, { key: "Mountain" }, { key: "City" }]} // Add more categories as needed
+          data={[
+            { key: "hotels" },
+            { key: "attractions" },
+            { key: "restaurants" },
+          ]}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.categoryItem}>
+            <TouchableOpacity
+              onPress={() => setEstablishmentType(item.key)}
+              style={styles.categoryItem}
+            >
               <Text>{item.key}</Text>
             </TouchableOpacity>
           )}
         />
       </View>
+
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.destinationContainer}>
+          {data?.data?.length > 0 &&
+            data?.data?.map((i) => (
+              <View style={styles.destinationItem}>
+                <View style={styles.cartContainer}>
+                  <Text style={styles.destinationText}>
+                    {i?.name?.length > 14
+                      ? `${i?.name.slice(0, 14)}..`
+                      : i?.name}
+                  </Text>
+                  <Text style={styles.destinationLocation}>
+                    {i?.location_string?.length > 18
+                      ? `${i?.location_string.slice(0, 18)}..`
+                      : i?.location_string}
+                  </Text>
+                  <Image
+                    style={styles.destinationImage}
+                    source={{
+                      uri: i?.photo?.images?.medium?.url
+                        ? i?.photo?.images?.medium?.url
+                        : "https://cdn.pixabay.com/photo/2015/10/30/12/22/eat-1014025_1280.jpg",
+                    }}
+                  />
+                </View>
+              </View>
+            ))}
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -166,16 +241,6 @@ const styles = StyleSheet.create({
     padding: 10,
     marginRight: 10,
   },
-  destinationItem: {
-    marginVertical: 10,
-    marginHorizontal: 20,
-    borderRadius: 15,
-  },
-  destinationImage: {
-    width: 100,
-    height: 200,
-    borderWidth: 3,
-  },
   destinationName: {
     position: "absolute",
     bottom: 10,
@@ -192,7 +257,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "white",
-    zIndex: 1, // Make sure this view floats above all others
+    zIndex: 10, // Make sure this view floats above all others
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,
@@ -205,6 +270,37 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: 16,
+  },
+  scrollView: {
+    // Styling for the ScrollView
+  },
+  destinationContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  destinationItem: {
+    // padding: 20,
+    width: "50%",
+    // marginVertical: 10,
+    // marginHorizontal: 20,
+    borderRadius: 15,
+  },
+  cartContainer: {
+    margin: 20,
+    // borderWidth: 1,
+    borderRadius: 15,
+  },
+  destinationText: {
+    // Style for the destination text
+  },
+  destinationLocation: {
+    // Style for the destination location
+  },
+  destinationImage: {
+    width: "100%",
+    height: 100,
+    resizeMode: "cover",
+    borderRadius: 15,
   },
   // ... add more styles for other elements like rating, price, bottom tab navigator
 });

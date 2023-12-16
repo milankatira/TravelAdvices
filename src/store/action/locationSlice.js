@@ -20,7 +20,7 @@ export const fetchLocationData = createAsyncThunk(
     };
 
     const response = await axios.request(options);
-    console.log(response.data, "response.data");
+    // console.log(response.data[0], "response.data");
     return response.data && response.data[0];
   }
 );
@@ -40,10 +40,12 @@ export const locationSlice = createSlice({
         state.status = "loading";
       })
       .addCase(fetchLocationData.fulfilled, (state, action) => {
+        // console.log(action.payload, "action.payload");
         state.status = "succeeded";
         state.data = action.payload;
       })
       .addCase(fetchLocationData.rejected, (state, action) => {
+        console.log(action.error, "eror");
         state.status = "failed";
         state.error = action.error.message;
       });
