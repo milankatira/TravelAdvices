@@ -1,16 +1,61 @@
 import { Ionicons } from "@expo/vector-icons"; // Make sure to install expo icons or another icon library
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   FlatList,
-  Image,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchLocationData } from "../store/action/locationSlice";
+import { fetchPlaces } from "../store/action/placeSlice";
 
 const travelAppUI = () => {
+  const { places, loading, error } = useSelector((state: any) => state.place);
+  const { data } = useSelector((state: any) => state.location);
+  console.log(data, "data");
+  const dispatch = useDispatch();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedTerm(searchTerm);
+
+      if (searchTerm) {
+        setIsSearching(true);
+      } else {
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (debouncedTerm) {
+      dispatch(fetchPlaces(debouncedTerm));
+    }
+  }, [debouncedTerm]);
+
+  const getCoordinated = async (data) => {
+   const d= await dispatch(fetchLocationData(data)).unwrap();
+   console.log(d,"DD")
+  };
+
+  const renderItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.item}
+      onPress={() => getCoordinated(item.description)}
+    >
+      <Text style={styles.itemText}>{item.description}</Text>
+    </TouchableOpacity>
+  );
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -22,6 +67,7 @@ const travelAppUI = () => {
         <Text style={styles.title}>Where do you want to travel?</Text>
         <View style={styles.searchBox}>
           <TextInput
+            onChangeText={setSearchTerm}
             style={{
               width: "90%",
               borderWidth: 0,
@@ -37,6 +83,20 @@ const travelAppUI = () => {
             color="grey"
           />
         </View>
+
+        {isSearching && (
+          <View style={styles.floatingContainer}>
+            {loading && <Text>Loading...</Text>}
+            {error && <Text>Error: {error.message}</Text>}
+            {!loading && !error && (
+              <FlatList
+                data={places?.predictions}
+                renderItem={renderItem}
+                keyExtractor={(item, index) => index.toString()}
+              />
+            )}
+          </View>
+        )}
       </View>
       <View style={styles.categoryContainer}>
         <Text style={styles.categoryTitle}>Explore Categories</Text>
@@ -49,10 +109,7 @@ const travelAppUI = () => {
             </TouchableOpacity>
           )}
         />
-
-        
       </View>
-
     </View>
   );
 };
@@ -117,7 +174,7 @@ const styles = StyleSheet.create({
   destinationImage: {
     width: 100,
     height: 200,
-    borderWidth:3
+    borderWidth: 3,
   },
   destinationName: {
     position: "absolute",
@@ -126,6 +183,28 @@ const styles = StyleSheet.create({
     color: "black",
     fontSize: 20,
     fontWeight: "bold",
+  },
+
+  floatingContainer: {
+    marginHorizontal: 20,
+    position: "absolute",
+    top: 80, // This should be the sum of the searchContainer's height and marginTop
+    left: 0,
+    right: 0,
+    backgroundColor: "white",
+    zIndex: 1, // Make sure this view floats above all others
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    maxHeight: 200, // Set a max height if you like
+  },
+  item: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  itemText: {
+    fontSize: 16,
   },
   // ... add more styles for other elements like rating, price, bottom tab navigator
 });
